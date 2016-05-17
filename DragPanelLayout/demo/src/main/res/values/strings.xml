@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">DragPanelLayout</string>
+    <string-array name="list">
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+        <item>List</item>
+    </string-array>
+</resources>

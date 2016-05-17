@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#DCDCDC"
+    android:orientation="vertical"
+    tools:context=".MainActivity">
+
+    <TextView
+        android:id="@+id/text"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="#afa859"
+        android:gravity="center"
+        android:text="Hello DragPanelLayout!"/>
+
+    <com.kyleduo.dragpanellayout.DragPanelLayout
+        android:id="@+id/dpl"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:kdplContentDragEnabled="false"
+        app:kdplDragBarHeight="80dp"
+        app:kdplForbiddenZoneSize="48dp"
+        app:kdplPanelLayoutType="alignEdge"
+        app:kdplPanelState="collapsed"
+        app:kdplParallaxOffset="60dp"
+        >
+
+        <!-- Content view -->
+        <com.kyleduo.dragpanellayout.demo.CustomView
+            android:id="@id/kdpl_content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/test"
+            />
+
+
+        <!-- Panel View -->
+        <LinearLayout
+            android:id="@id/kdpl_draggable_panel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#88fc8467"
+            android:clickable="true"
+            android:orientation="vertical">
+
+            <ListView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:entries="@array/list"
+                />
+
+        </LinearLayout>
+    </com.kyleduo.dragpanellayout.DragPanelLayout>
+</LinearLayout>
