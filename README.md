@@ -9,6 +9,7 @@ By now, you can create panel just **follow the content** and forbid the panel mo
 
 The final 1.0 version will be much more stable and other enhanced feature will release after that.
 
+
 #### ToDo:
 
 - 4 directions support.
