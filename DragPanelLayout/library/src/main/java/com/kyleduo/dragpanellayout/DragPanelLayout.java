@@ -8,7 +8,6 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.v4.widget.ViewDragHelper;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -89,6 +88,7 @@ public class DragPanelLayout extends ViewGroup {
 
 	/// config value
 	private boolean mDragEnabled = true;
+
 	/**
 	 * Size of area where panel can not go in. Typically used when there are some view you wanna
 	 * leave outside of the panel expanded area, in pixel.
@@ -99,6 +99,7 @@ public class DragPanelLayout extends ViewGroup {
 	 */
 	private PanelLayoutType mPanelLayoutType;
 	private int mDragBarHeight;
+
 	/**
 	 * Distance of contentView's parallax.
 	 */
@@ -165,14 +166,9 @@ public class DragPanelLayout extends ViewGroup {
 	}
 
 	private void init(AttributeSet attrs) {
-		if (isInEditMode()) {
-			mViewDragHelper = null;
-			return;
-		}
-
 		mViewDragHelper = ViewDragHelper.create(this, 0.5f, new ViewDragHelperCallback());
 		mPanelLayoutType = PanelLayoutType.ALIGN_EDGE;
-		mDragPanelHelper = new com.kyleduo.dragpanellayout.DragPanelHelper();
+		mDragPanelHelper = new DragPanelHelper();
 
 		TypedArray ta = attrs == null ? null : getContext().obtainStyledAttributes(attrs, R.styleable.DragPanelLayout);
 		if (ta != null) {
@@ -345,28 +341,37 @@ public class DragPanelLayout extends ViewGroup {
 		int left = getPaddingLeft();
 		int top = getPaddingTop();
 
+		if (mPanelLayoutType == PanelLayoutType.FOLLOW_CONTENT) {
+			mCollapsedYPosition = getPaddingTop() + mContentView.getMeasuredHeight()
+					+ ((LayoutParams) mContentView.getLayoutParams()).bottomMargin
+					+ ((LayoutParams) mDraggableView.getLayoutParams()).topMargin;
+		} else {
+			mCollapsedYPosition = getMeasuredHeight() - mDragBarHeight;
+		}
+
+		int draggableViewTop = mCollapsedYPosition;
+		if (mDragState == DragState.COLLAPSED) {
+			draggableViewTop = mCollapsedYPosition;
+		} else if (mDragState == DragState.EXPANDED) {
+			draggableViewTop = mCollapsedYPosition - mScrollRange;
+		} else if (mDragState == DragState.HIDDEN) {
+			draggableViewTop = getMeasuredHeight();
+		}
+
 		for (int i = 0; i < getChildCount(); i++) {
 			View child = getChildAt(i);
 			int childWidth = child.getMeasuredWidth();
 			int childHeight = child.getMeasuredHeight();
 
 			if (child == mDraggableView) {
-				if (mPanelLayoutType == PanelLayoutType.FOLLOW_CONTENT) {
-					mCollapsedYPosition = top + mContentView.getMeasuredHeight()
-							+ ((LayoutParams) mContentView.getLayoutParams()).bottomMargin
-							+ ((LayoutParams) child.getLayoutParams()).topMargin;
-				} else {
-					mCollapsedYPosition = getMeasuredHeight() - mDragBarHeight;
-				}
-
 				if (mDragState == DragState.COLLAPSED) {
 					top = mCollapsedYPosition;
 				} else if (mDragState == DragState.EXPANDED) {
 					top = mCollapsedYPosition - mScrollRange;
 				} else if (mDragState == DragState.HIDDEN) {
-					top = mCollapsedYPosition + getMeasuredHeight() - mCollapsedYPosition;
+					top = getMeasuredHeight();
 				}
-
+				draggableViewTop = top;
 				if (mPanelLayoutType == PanelLayoutType.FOLLOW_CONTENT) {
 					mScrollRange = Math.max(mDraggableView.getMeasuredHeight() - (getMeasuredHeight() - mCollapsedYPosition), 0);
 				}
@@ -378,13 +383,15 @@ public class DragPanelLayout extends ViewGroup {
 					top -= mParallaxDistance;
 				}
 			} else if (child == mHelperDraggableView) {
-				top = mDraggableView.getTop() - mHelperDraggableView.getMeasuredHeight();
+				top = draggableViewTop - mHelperDraggableView.getMeasuredHeight();
 			}
+
+//			LogUtils.d(TAG, child + " left: " + left + " top: " + top);
 
 			child.layout(left, top, left + childWidth, top + childHeight);
 		}
 
-		mDraggingProgress = computeProgress(mDraggableView.getTop());
+		fixPanelStateByPosition();
 	}
 
 	///////////////////////////////////////////////////////////
@@ -395,17 +402,14 @@ public class DragPanelLayout extends ViewGroup {
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent ev) {
 		int action = ev.getActionMasked();
-		Log.d(TAG, "dispatchTouchEvent " + action);
 		switch (action) {
 			case MotionEvent.ACTION_DOWN:
 				mShouldInterceptTouchEvent = true;
 				mDragPanelHelper.tryCaptureScrollableView(mDraggableView, ev);
 				break;
 			case MotionEvent.ACTION_MOVE:
-				Log.d(TAG, "mLastStaticDragState: " + mLastStaticDragState + " state: " + mDragState);
 				DragState state = (mDragState == DragState.COLLAPSED || mDragState == DragState.EXPANDED) ? mDragState : mLastStaticDragState;
 				boolean intercept = mDragPanelHelper.canDrag(state, ev);
-				Log.d(TAG, "intercept: " + intercept);
 				if (!intercept) {
 					mShouldInterceptTouchEvent = false;
 					if (mViewDragHelper.getViewDragState() == ViewDragHelper.STATE_DRAGGING) {
@@ -430,7 +434,6 @@ public class DragPanelLayout extends ViewGroup {
 
 	@Override
 	public boolean onInterceptTouchEvent(MotionEvent event) {
-		Log.i(TAG, "onInterceptTouchEvent " + event.getActionMasked() + " mShouldInterceptTouchEvent: " + mShouldInterceptTouchEvent);
 		if (!mDragEnabled || !isEnabled() || !mShouldInterceptTouchEvent) {
 			mViewDragHelper.abort();
 			return false;
@@ -439,21 +442,10 @@ public class DragPanelLayout extends ViewGroup {
 		switch (action) {
 			case MotionEvent.ACTION_CANCEL:
 			case MotionEvent.ACTION_UP:
-				// If the dragView is still dragging when we get here, we need to call processTouchEvent
-				// so that the view is settled
-				// Added to make scrollable views work (tokudu)
 				if (mViewDragHelper.getViewDragState() == ViewDragHelper.STATE_DRAGGING) {
 					mViewDragHelper.processTouchEvent(event);
 					return true;
 				}
-				// Check if this was a click on the faded part of the screen, and fire off the listener if there is one.
-//				if (ady <= dragSlop
-//						&& adx <= dragSlop
-//						&& mSlideOffset > 0 && !isViewUnder(mSlideableView, (int) mInitialMotionX, (int) mInitialMotionY) && mFadeOnClickListener != null) {
-//					playSoundEffect(android.view.SoundEffectConstants.CLICK);
-//					mFadeOnClickListener.onClick(this);
-//					return true;
-//				}
 				break;
 		}
 
@@ -462,7 +454,6 @@ public class DragPanelLayout extends ViewGroup {
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
-		Log.w(TAG, "onTouchEvent " + event.getActionMasked());
 		if (!mDragEnabled || !isEnabled()) {
 			return false;
 		}
@@ -543,6 +534,27 @@ public class DragPanelLayout extends ViewGroup {
 		mOnDragListener = onDragListener;
 	}
 
+	public void setParallaxDistance(int parallaxDistance) {
+		mParallaxDistance = parallaxDistance;
+	}
+
+	public void setForbiddenZoneSize(int forbiddenZoneSize) {
+		mForbiddenZoneSize = forbiddenZoneSize;
+	}
+
+	public void collapse() {
+		post(new Runnable() {
+			@Override
+			public void run() {
+				mViewDragHelper.smoothSlideViewTo(mDraggableView, mDraggableView.getLeft(), mCollapsedYPosition);
+//				if (mHelperDraggableView != null) {
+//					mViewDragHelper.smoothSlideViewTo(mHelperDraggableView, mHelperDraggableView.getLeft(), 0);
+//				}
+				postInvalidate();
+			}
+		});
+	}
+
 	///////////////////////////////////////////////////////////
 	/////////    Inner Classes
 	///////////////////////////////////////////////////////////
@@ -605,8 +617,6 @@ public class DragPanelLayout extends ViewGroup {
 			int collapseDiacriticalPosition = (int) (collapsedPosition - mScrollRange * (1 - mDiacriticalPositionRatio));
 			int collapseFlingDiacriticalPosition = (int) (collapsedPosition - mScrollRange * (1 - flingRatio));
 
-//			Log.d(TAG, "absv: " + absv + " currentPosition: " + currentPosition + " expandFlingDiacriticalPosition: " + expandFlingDiacriticalPosition);
-
 			switch (mLastStaticDragState) {
 				case COLLAPSED:
 					if (yvel <= 0) {
@@ -646,15 +656,13 @@ public class DragPanelLayout extends ViewGroup {
 		public void onViewPositionChanged(View changedView, int left, int top, int dx, int dy) {
 			super.onViewPositionChanged(changedView, left, top, dx, dy);
 
-			Log.e(TAG, "onViewPositionChanged: " + top);
-
 			fixPanelStateByPosition();
 			dispatchOnDragging();
 
 			if (changedView == mHelperDraggableView) {
 				mDraggableView.offsetTopAndBottom(dy);
 			} else if (changedView == mDraggableView && mHelperDraggableView != null) {
-				mHelperDraggableView.offsetTopAndBottom(dy);
+				mHelperDraggableView.offsetTopAndBottom(top - mHelperDraggableView.getMeasuredHeight() - mHelperDraggableView.getTop());
 			}
 			if (mParallaxDistance > 0) {
 				int targetTop = mHelperCollapsedYPosition - (int) Math.floor(mParallaxDistance * mDraggingProgress);
@@ -667,7 +675,7 @@ public class DragPanelLayout extends ViewGroup {
 	/**
 	 * LayoutParams that account of weight when measuring draggable view.
 	 */
-	public static class LayoutParams extends ViewGroup.MarginLayoutParams {
+	public static class LayoutParams extends MarginLayoutParams {
 		private static final int[] ATTRS = new int[]{
 				android.R.attr.layout_weight
 		};
@@ -687,7 +695,7 @@ public class DragPanelLayout extends ViewGroup {
 			this.weight = weight;
 		}
 
-		public LayoutParams(android.view.ViewGroup.LayoutParams source) {
+		public LayoutParams(ViewGroup.LayoutParams source) {
 			super(source);
 		}
 
@@ -734,8 +742,8 @@ public class DragPanelLayout extends ViewGroup {
 			out.writeString(mDragState == null ? null : mDragState.toString());
 		}
 
-		public static final Parcelable.Creator<SavedState> CREATOR =
-				new Parcelable.Creator<SavedState>() {
+		public static final Creator<SavedState> CREATOR =
+				new Creator<SavedState>() {
 					@Override
 					public SavedState createFromParcel(Parcel in) {
 						return new SavedState(in);
