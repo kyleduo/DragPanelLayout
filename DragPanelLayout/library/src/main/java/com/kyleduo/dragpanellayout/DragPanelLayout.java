@@ -547,9 +547,16 @@ public class DragPanelLayout extends ViewGroup {
 			@Override
 			public void run() {
 				mViewDragHelper.smoothSlideViewTo(mDraggableView, mDraggableView.getLeft(), mCollapsedYPosition);
-//				if (mHelperDraggableView != null) {
-//					mViewDragHelper.smoothSlideViewTo(mHelperDraggableView, mHelperDraggableView.getLeft(), 0);
-//				}
+				postInvalidate();
+			}
+		});
+	}
+
+	public void expand() {
+		post(new Runnable() {
+			@Override
+			public void run() {
+				mViewDragHelper.smoothSlideViewTo(mDraggableView, mDraggableView.getLeft(), mCollapsedYPosition - mScrollRange);
 				postInvalidate();
 			}
 		});
