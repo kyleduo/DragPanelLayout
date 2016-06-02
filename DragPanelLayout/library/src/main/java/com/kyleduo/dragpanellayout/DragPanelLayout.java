@@ -8,6 +8,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.v4.widget.ViewDragHelper;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -128,7 +129,7 @@ public class DragPanelLayout extends ViewGroup {
 	private float mFlingDiacriticalPositionRatioScale = 100000;
 	private float mPreviousTouchY;
 	private DragPanelHelper mDragPanelHelper;
-	private boolean mShouldInterceptTouchEvent = true;
+	private boolean mScrollableViewHandleEvent = false;
 
 	/// views
 	/**
@@ -404,28 +405,29 @@ public class DragPanelLayout extends ViewGroup {
 		int action = ev.getActionMasked();
 		switch (action) {
 			case MotionEvent.ACTION_DOWN:
-				mShouldInterceptTouchEvent = true;
+				mScrollableViewHandleEvent = false;
 				mDragPanelHelper.tryCaptureScrollableView(mDraggableView, ev);
 				break;
 			case MotionEvent.ACTION_MOVE:
-				DragState state = (mDragState == DragState.COLLAPSED || mDragState == DragState.EXPANDED) ? mDragState : mLastStaticDragState;
+//				DragState state = (mDragState == DragState.COLLAPSED || mDragState == DragState.EXPANDED) ? mDragState : mLastStaticDragState;
+				DragState state = mDragState;
 				boolean intercept = mDragPanelHelper.canDrag(state, ev);
 				if (!intercept) {
-					mShouldInterceptTouchEvent = false;
+					mScrollableViewHandleEvent = true;
 					if (mViewDragHelper.getViewDragState() == ViewDragHelper.STATE_DRAGGING) {
 						mViewDragHelper.cancel();
 						ev.setAction(MotionEvent.ACTION_DOWN);
 					}
 					return super.dispatchTouchEvent(ev);
 				} else {
-					if (!mShouldInterceptTouchEvent) {
+					if (mScrollableViewHandleEvent) {
 						MotionEvent up = MotionEvent.obtain(ev);
 						up.setAction(MotionEvent.ACTION_CANCEL);
 						super.dispatchTouchEvent(up);
 						up.recycle();
 						ev.setAction(MotionEvent.ACTION_DOWN);
 					}
-					mShouldInterceptTouchEvent = true;
+					mScrollableViewHandleEvent = false;
 					return this.onTouchEvent(ev);
 				}
 		}
@@ -434,7 +436,7 @@ public class DragPanelLayout extends ViewGroup {
 
 	@Override
 	public boolean onInterceptTouchEvent(MotionEvent event) {
-		if (!mDragEnabled || !isEnabled() || !mShouldInterceptTouchEvent) {
+		if (!mDragEnabled || !isEnabled() || mScrollableViewHandleEvent) {
 			mViewDragHelper.abort();
 			return false;
 		}
@@ -481,7 +483,7 @@ public class DragPanelLayout extends ViewGroup {
 	/////////    internal methods
 	///////////////////////////////////////////////////////////
 
-	private void setPanelStateInternal(DragState state) {
+	private void setDragStateInternal(DragState state) {
 		if (mDragState == state) {
 			return;
 		}
@@ -490,15 +492,16 @@ public class DragPanelLayout extends ViewGroup {
 			mLastStaticDragState = oldState;
 		}
 		mDragState = state;
+		Log.d(TAG, "new state: " + mDragState);
 		dispatchOnPanelStateChanged(oldState, state);
 	}
 
 	private void fixPanelStateByPosition() {
 		mDraggingProgress = computeProgress(mDraggableView.getTop());
 		if (mDraggingProgress == 0) {
-			setPanelStateInternal(DragState.COLLAPSED);
+			setDragStateInternal(DragState.COLLAPSED);
 		} else if (mDraggingProgress == 1) {
-			setPanelStateInternal(DragState.EXPANDED);
+			setDragStateInternal(DragState.EXPANDED);
 		}
 	}
 
@@ -599,11 +602,11 @@ public class DragPanelLayout extends ViewGroup {
 			switch (state) {
 				case ViewDragHelper.STATE_DRAGGING:
 					if (mDragState != DragState.DRAGGING) {
-						setPanelStateInternal(DragState.DRAGGING);
+						setDragStateInternal(DragState.DRAGGING);
 					}
 					break;
 				case ViewDragHelper.STATE_SETTLING:
-					setPanelStateInternal(DragState.SETTLING);
+					setDragStateInternal(DragState.SETTLING);
 					break;
 			}
 		}

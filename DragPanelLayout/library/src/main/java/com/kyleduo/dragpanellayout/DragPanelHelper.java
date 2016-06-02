@@ -18,7 +18,6 @@ public class DragPanelHelper {
 	private static final String TAG = "DragPanelHelper";
 
 	private View mCurrentScrollableView;
-	private Rect mTempRect = new Rect();
 	private PointF mInitialPoint = new PointF();
 
 	public void tryCaptureScrollableView(View draggableView, MotionEvent event) {
@@ -55,20 +54,16 @@ public class DragPanelHelper {
 		if (pointInView(mCurrentScrollableView, (int) event.getRawX(), (int) event.getRawY())) {
 			return checkDrag(mCurrentScrollableView, state, (int) (event.getRawX() - mInitialPoint.x), (int) (event.getRawY() - mInitialPoint.y));
 		}
-		Log.i(TAG, "not in view");
 		return true;
 	}
 
 	protected boolean checkDrag(View scrollableView, DragPanelLayout.DragState state, int dx, int dy) {
 		if (state == DragPanelLayout.DragState.EXPANDED && dy < 0) {
-			Log.i(TAG, "scroll list");
 			return false;
 		}
 		if (state == DragPanelLayout.DragState.EXPANDED && dy > 0 && !isAtTop(scrollableView)) {
-			Log.i(TAG, "do not drag");
 			return false;
 		}
-		Log.i(TAG, "drag");
 		return true;
 	}
 
@@ -77,14 +72,8 @@ public class DragPanelHelper {
 			return false;
 		}
 
-		Log.i(TAG, "x: " + x + " y: " + y);
-//		Log.i(TAG, "left: " + view.getLeft() + " top: " + view.getTop() + " right: " + view.getRight() + " bottom: " + view.getBottom());
-
 		int[] loc = new int[2];
 		view.getLocationOnScreen(loc);
-		Log.i(TAG, "left: " + loc[0] + " top: " + loc[1] + " right: " + (loc[0] + view.getMeasuredWidth()) + " bottom: " + (loc[1] + view.getMeasuredHeight()));
-
-
 		return x > loc[0] && x < loc[0] + view.getMeasuredWidth()
 				&& y > loc[1] && y < loc[1] + view.getMeasuredHeight();
 	}
@@ -97,7 +86,6 @@ public class DragPanelHelper {
 			}
 
 			boolean atTop = lv.getChildCount() > 0 && lv.getFirstVisiblePosition() == 0 && lv.getChildAt(0).getTop() >= lv.getPaddingTop();
-			Log.d(TAG, "atTop: " + atTop);
 			return atTop;
 		} else if (view instanceof ScrollView) {
 			return view.getScrollY() == 0;
